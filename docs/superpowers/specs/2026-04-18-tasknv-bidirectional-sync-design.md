@@ -176,6 +176,10 @@ require("tasknv").setup({
     -- UUID format pattern (UUID v4)
     uuid_pattern = "%x%x%x%x%x%x%x%x-%x%x%x%x-%x%x%x%x-%x%x%x%x-%x%x%x%x%x%x%x%x%x%x",
   },
+
+  -- Path to custom taskrc file. If nil, uses default (~/taskrc).
+  -- Useful for isolating taskwarrior data or using alternate configs.
+  taskrc_file = nil,
 })
 ```
 

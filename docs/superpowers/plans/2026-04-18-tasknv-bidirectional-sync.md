@@ -69,6 +69,9 @@ local defaults = {
     suffix = "-->",
     uuid_pattern = "%x%x%x%x%x%x%x%x-%x%x%x%x-%x%x%x%x-%x%x%x%x-%x%x%x%x%x%x%x%x%x%x",
   },
+  -- Path to custom taskrc file. If nil, uses default.
+  -- Useful for isolating taskwarrior data or using alternate configs.
+  taskrc_file = nil,
 }
 ```
 
@@ -78,89 +81,40 @@ local defaults = {
 git add lua/tasknv/config.lua && git commit -m "feat: add sync config options"
 ```
 
----
-
-### Task 2: Update Parser for Filter Extraction
-
-**Files:**
-- Modify: `lua/tasknv/parser.lua:1-93`
-
-- [ ] **Step 1: Read current parser**
+- [ ] **Step 2: Update config defaults**
 
 ```lua
--- Read lua/tasknv/parser.lua
-```
+local defaults = {
+  sync_on_save = true,
+  sync_debounce_ms = 500,
+  conflict_resolution = "markdown",
+  default_project = nil,
+  priority = {
+    ["!!!"] = "H",
+    ["!!"] = "M",
+    ["!"] = "L",
+  },
+  tags = {
+    -- empty by default
+  },
+  task_status = {
+    [" "] = "pending",
+    [">"] = "active",
+    ["x"] = "completed",
+    ["~"] = "deleted",
+  },
+metadata = {
+    -- Prefix/suffix for hidden metadata comments
+    prefix = "<!--",
+    suffix = "-->",
+    -- UUID format pattern (UUID v4)
+    uuid_pattern = "%x%x%x%x%x%x%x%x-%x%x%x%x-%x%x%x%x-%x%x%x%x-%x%x%x%x%x%x%x%x%x%x",
+  },
 
-- [ ] **Step 2: Update parser to extract filter from heading**
-
-The parser needs to:
-- Detect `## Heading | filter` syntax
-- Extract filter expression after `|`
-- Store filter as heading metadata
-- Tasks under this heading inherit the filter
-
-```lua
-M.extract_heading_filter = function(heading_text)
-  -- Match "## Heading | filter" syntax
-  local filter = heading_text:match("%s|%s(.+)$") or heading_text:match("%|(.+)$")
-  if filter then
-    -- Trim whitespace
-    filter = filter:match("^%s*(.-)%s*$")
-  end
-  return filter or nil
-end
-```
-
-- [ ] **Step 3: Update parse() to pass filter to iterate_tasklist**
-
-```lua
--- In parse(), when handling heading_text capture:
-if name == "heading_text" then
-  local current_heading = M.text(node)
-  current_heading_filters = M.extract_heading_filter(current_heading)
-end
-```
-
-- [ ] **Step 4: Test with sample markdown**
-
-```markdown
-## Work | project:Work
-* [ ] Task 1
-
-## Home | project:Home
-* [ ] Task 2
-
-## NoFilter
-* [ ] Should be ignored
-```
-
-Run parse and verify filter is extracted for Work and Home, nil for NoFilter.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add lua/tasknv/parser.lua && git commit -m "feat: extract filter from heading syntax"
-```
-
----
-
-### Task 3: Create Taskwarrior CLI Wrapper
-
-**Files:**
-- Create: `lua/tasknv/task.lua`
-
-- [ ] **Step 1: Write test for task wrapper**
-
-```lua
--- test/spec/task_spec.lua
-local task = require("tasknv.task")
-
-describe("taskwarrior wrapper", function()
-  it("should create a task", function()
-    local result = task.add({
-      description = "Test task",
-      project = "Home",
-    })
+  -- Path to custom taskrc file. If nil, uses default (~/taskrc).
+  -- Useful for isolating taskwarrior data or using alternate configs.
+  taskrc_file = nil,
+})
     assert.is_string(result.uuid)
   end)
 
@@ -191,9 +145,18 @@ cd /home/pete/Projects/tasknv.nvim && nvim --headless -u NONE -c "set rtp+=." -c
 ```lua
 -- lua/tasknv/task.lua
 local M = {}
+local config = require("tasknv.config")
+
+local function get_task_cmd(base_cmd)
+  local taskrc = config.taskrc_file
+  if taskrc then
+    return base_cmd .. " rc:" .. vim.fn.shellescape(taskrc)
+  end
+  return base_cmd
+end
 
 local function run_task(args)
-  local cmd = vim.fn.split("task " .. args)
+  local cmd = get_task_cmd("task " .. args)
   local output = vim.fn.system(cmd)
   if vim.v.shell_error ~= 0 then
     return nil, output
