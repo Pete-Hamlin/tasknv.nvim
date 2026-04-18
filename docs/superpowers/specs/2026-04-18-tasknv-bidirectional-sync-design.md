@@ -80,6 +80,19 @@ Markdown File → Treesitter Parse → Task List with Metadata
 
 **Trigger:** File save (via autocmd, configurable via `sync_on_save`)
 
+**Async Execution:**
+- All taskwarrior operations run asynchronously in the background
+- Buffer remains fully interactive during sync — user can edit/view while sync runs
+- User can trigger multiple syncs (subsequent syncs queue or replace previous)
+- No blocking of the main thread
+
+**Visual Feedback (Virtual Text):**
+- While sync is in progress, virtual text is shown on the first line of each task list:
+  - Processing state: "Syncing... (0/X tasks)"
+  - Progress updates: "Syncing... (3/10 tasks)"
+  - Completion: "Synced ✓" (fades after 2 seconds)
+- Virtual text updates in real-time as tasks are processed
+
 **Per-heading sync:**
 1. Parse markdown tasks under filtered heading
 2. Query taskwarrior for tasks matching filter
@@ -175,9 +188,10 @@ end)
 ```
 
 **Lua API:**
-- `require("tasknv").sync(opts)` — Run sync for current buffer
+- `require("tasknv").sync(opts)` — Run sync for current buffer (async, returns immediately)
   - `opts.conflict_resolution` — Override default conflict strategy ("markdown" | "taskwarrior" | "newer")
   - `opts.bufnr` — Specific buffer to sync (defaults to current)
+  - Returns: `{ sync_id: number, task_count: number }` — use sync_id to check status if needed
 
 ### 7. Ignored Tasks
 
