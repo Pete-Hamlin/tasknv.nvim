@@ -11,11 +11,13 @@ function M.show_progress(current, total, bufnr)
 
   local text = string.format("Syncing... (%d/%d tasks)", current, total)
 
-  vim.api.nvim_buf_set_extmark(bufnr, ns, line, 0, {
-    virt_text = {{ text, "Comment" }},
-    virt_text_pos = "overlay",
-    ephemeral = true,
-  })
+  pcall(function()
+    vim.api.nvim_buf_set_extmark(bufnr, ns, line, 0, {
+      virt_text = {{ text, "Comment" }},
+      virt_text_pos = "overlay",
+      ephemeral = true,
+    })
+  end)
 
   M.active[bufnr] = { current = current, total = total }
 end

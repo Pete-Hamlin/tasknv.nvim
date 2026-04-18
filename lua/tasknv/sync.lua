@@ -2,6 +2,7 @@ local M = {}
 local parser = require("tasknv.parser")
 local task = require("tasknv.task")
 local config = require("tasknv.config")
+local virtual = require("tasknv.virtual")
 
 M.sync_id = 0
 M.active_syncs = {}
@@ -78,6 +79,16 @@ function M.sync(opts)
 		parser.setup({ bufnr = bufnr })
 		local parsed = parser.parse()
 
+		local total_headings = 0
+		for _, heading in ipairs(parsed.headings or {}) do
+			if heading.filter then
+				total_headings = total_headings + 1
+			end
+		end
+
+		virtual.show_progress(0, total_headings, bufnr)
+
+		local current = 0
 		for _, heading in ipairs(parsed.headings or {}) do
 			if heading.filter then
 				local merge_result = M.merge(heading.filter, heading.tasks, conflict_resolution)
@@ -90,8 +101,13 @@ function M.sync(opts)
 				for _, task_data in ipairs(merge_result.to_update) do
 					task.update(task_data.uuid, task_data)
 				end
+
+				current = current + 1
+				virtual.show_progress(current, total_headings, bufnr)
 			end
 		end
+
+		virtual.clear(bufnr)
 	end, 0)
 
 	return { sync_id = current_sync_id }
