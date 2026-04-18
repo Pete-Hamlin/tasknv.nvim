@@ -1,22 +1,32 @@
--- TODO: Add typing info
+-- ABOUTME: Configuration defaults for tasknv plugin
 local M = {}
 
 ---@class tasknv.Config
 local defaults = {
-	task = {
-		status = {
-			[" "] = "pending",
-			[">"] = "active",
-			["x"] = "completed",
-			["~"] = "deleted",
-		},
-		id = "%x*-%x*-%x*-%x*-%x*",
+	sync_on_save = true,
+	sync_debounce_ms = 500,
+	conflict_resolution = "markdown",
+	default_project = nil,
+	priority = {
+		["!!!"] = "H",
+		["!!"] = "M",
+		["!"] = "L",
+	},
+	tags = {
+		-- empty by default
+	},
+	task_status = {
+		[" "] = "pending",
+		[">"] = "active",
+		["x"] = "completed",
+		["~"] = "deleted",
 	},
 	metadata = {
-		prefix = "%<%!%-%-",
-		suffix = "%-%-%>",
-		id = "%x*-%x*-%x*-%x*-%x*",
+		prefix = "<!--",
+		suffix = "-->",
+		uuid_pattern = "%x%x%x%x%x%x%x%x-%x%x%x%x-%x%x%x%x-%x%x%x%x-%x%x%x%x%x%x%x%x%x%x",
 	},
+	taskrc_file = nil,
 }
 
 ---@param opts? tasknv.Config
