@@ -59,7 +59,7 @@ M.parse = function()
 		table.insert(headings, current_heading)
 	end
 
-	print("[==M.parse headings:==]", vim.inspect(headings))
+	
 	return { headings = headings }
 end
 
@@ -71,6 +71,9 @@ end
 
 M.extract_filter = function(str)
 	local filter = str:match("%s*|%s*(.+)")
+	if filter then
+		filter = filter:match("^%s*(.-)%s*$")
+	end
 	return filter or ""
 end
 

@@ -76,11 +76,28 @@ describe("parser integration", function()
     assert.is_equal("Fix critical bug due:2024-01-15", first_task.details)
   end)
 
-  it("should mark tasks under non-filtered heading as ignored", function()
+  it("should have empty filter for heading without metadata", function()
     local result = parser.parse()
     local personal_heading = result.headings[3]
 
     -- Personal has no filter, so it's ignored for sync
     assert.is_equal("", personal_heading.filter)
+  end)
+end)
+
+describe("extract_filter", function()
+  it("should extract filter after pipe", function()
+    local result = parser.extract_filter("Work | project:Work +urgent")
+    assert.is_equal("project:Work +urgent", result)
+  end)
+
+  it("should return empty string for no pipe", function()
+    local result = parser.extract_filter("Work")
+    assert.is_equal("", result)
+  end)
+
+  it("should return empty string for pipe with no filter", function()
+    local result = parser.extract_filter("Work | ")
+    assert.is_equal("", result)
   end)
 end)
