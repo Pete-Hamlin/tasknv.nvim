@@ -4,7 +4,7 @@ local config = require("tasknv.config")
 
 local function get_task_cmd(base_cmd)
   local taskrc = config.taskrc_file
-  if taskrc then
+  if taskrc and vim.fn.filereadable(taskrc) == 1 then
     return base_cmd .. " rc:" .. vim.fn.shellescape(taskrc)
   end
   return base_cmd
@@ -41,8 +41,9 @@ function M.add(task_data)
   end
 
   local output = run_task(cmd)
-  local uuid = output:match("Created task (%d+)")
-  return { uuid = uuid, id = tonumber(uuid:match("%d+")) }
+  local id = output:match("Created task (%d+)")
+  local tasks = M.query("id:" .. id)
+  return tasks[1]
 end
 
 function M.query(filter)
@@ -63,10 +64,10 @@ function M.get(uuid)
 end
 
 function M.update(uuid, task_data)
-  local cmd = vim.fn.shellescape(uuid) .. " modify"
+  local cmd = uuid .. ' modify'
 
   if task_data.description then
-    cmd = cmd .. " " .. vim.fn.shellescape(task_data.description)
+    cmd = cmd .. ' ' .. vim.fn.shellescape(task_data.description)
   end
   if task_data.project then
     cmd = cmd .. " project:" .. vim.fn.shellescape(task_data.project)
