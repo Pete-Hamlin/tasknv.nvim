@@ -23,6 +23,11 @@ lua/tasknv/
 ├── pipeline.lua   -- Existing, may use for async chain
 └── health.lua     -- Existing
 
+test/
+├── fixtures/taskrc   -- Isolated taskrc for tests
+├── helpers.lua      -- Test helper functions
+└── spec/            -- Test files
+
 queries/markdown/
 └── tasknv_task_list.scm  -- Treesitter query (may need updates)
 ```
@@ -81,40 +86,82 @@ local defaults = {
 git add lua/tasknv/config.lua && git commit -m "feat: add sync config options"
 ```
 
-- [ ] **Step 2: Update config defaults**
+---
+
+### Task 2: Create Test Infrastructure (Isolated TaskRC)
+
+**Files:**
+- Create: `test/fixtures/taskrc`
+- Create: `test/helpers.lua`
+
+- [ ] **Step 1: Create isolated taskrc file**
 
 ```lua
-local defaults = {
-  sync_on_save = true,
-  sync_debounce_ms = 500,
-  conflict_resolution = "markdown",
-  default_project = nil,
-  priority = {
-    ["!!!"] = "H",
-    ["!!"] = "M",
-    ["!"] = "L",
-  },
-  tags = {
-    -- empty by default
-  },
-  task_status = {
-    [" "] = "pending",
-    [">"] = "active",
-    ["x"] = "completed",
-    ["~"] = "deleted",
-  },
-metadata = {
-    -- Prefix/suffix for hidden metadata comments
-    prefix = "<!--",
-    suffix = "-->",
-    -- UUID format pattern (UUID v4)
-    uuid_pattern = "%x%x%x%x%x%x%x%x-%x%x%x%x-%x%x%x%x-%x%x%x%x-%x%x%x%x%x%x%x%x%x%x",
-  },
+-- test/fixtures/taskrc
+data.location=/home/pete/Projects/tasknv.nvim/test/data/task
+```
 
-  -- Path to custom taskrc file. If nil, uses default (~/taskrc).
-  -- Useful for isolating taskwarrior data or using alternate configs.
-  taskrc_file = nil,
-})
+- [ ] **Step 2: Create test helper module**
+
+```lua
+-- test/helpers.lua
+local M = {}
+
+M.test_taskrc = "/home/pete/Projects/tasknv.nvim/test/fixtures/taskrc"
+M.test_data_dir = "/home/pete/Projects/tasknv.nvim/test/data"
+
+function M.setup_test_env()
+  -- Create fresh test data directory
+  vim.fn.mkdir(M.test_data_dir, "p")
+  
+  -- Clean any existing test data
+  local data_file = M.test_data_dir .. "/task.data"
+  if vim.fn.filereadable(data_file) == 1 then
+    vim.fn.delete(data_file)
+  end
+end
+
+function M.get_test_config()
+  return {
+    taskrc_file = M.test_taskrc,
+    sync_on_save = false,
+  }
+end
+
+return M
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add test/fixtures/taskrc test/helpers.lua && git commit -m "test: add isolated test taskrc infrastructure"
+```
+
+---
+
+### Task 3: Create Taskwarrior CLI Wrapper
+
+**Files:**
+- Create: `lua/tasknv/task.lua`
+- Modify: `test/spec/task_spec.lua` to use test helpers
+
+- [ ] **Step 1: Write test for task wrapper**
+
+```lua
+-- test/spec/task_spec.lua
+local task = require("tasknv.task")
+local helpers = require("test.helpers")
+
+describe("taskwarrior wrapper", function()
+  setup(function()
+    helpers.setup_test_env()
+  end)
+
+  it("should create a task", function()
+    local result = task.add({
+      description = "Test task",
+      project = "Home",
+    })
     assert.is_string(result.uuid)
   end)
 
@@ -238,7 +285,6 @@ return M
 - [ ] **Step 4: Run test to verify it passes**
 
 ```bash
-# Run the tests with busted
 cd /home/pete/Projects/tasknv.nvim && nvim --headless -u NONE -c "set rtp+=." -c "lua require('busted.runner')({standalone=false})" test/spec/task_spec.lua 2>&1
 ```
 
@@ -262,8 +308,13 @@ git add lua/tasknv/task.lua test/spec/task_spec.lua && git commit -m "feat: add 
 local sync = require("tasknv.sync")
 local parser = require("tasknv.parser")
 local task = require("tasknv.task")
+local helpers = require("test.helpers")
 
 describe("sync engine", function()
+  setup(function()
+    helpers.setup_test_env()
+  end)
+
   local test_buffer = [[
 ## Work | project:TestProject
 * [ ] Existing task
@@ -274,7 +325,7 @@ describe("sync engine", function()
     local tw_task = task.add({ description = "TW only task", project = "TestProject" })
     
     -- Run sync
-    local result = sync.merge(test_buffer, "markdown")
+    local result = sync.merge("project:TestProject", test_buffer, "markdown")
     
     -- Should have both markdown task and TW task
     assert.is_true(result.has_markdown_task)
@@ -301,6 +352,7 @@ local config = require("tasknv.config")
 
 M.sync_id = 0
 M.active_syncs = {} -- bufnr -> sync_id
+M.debounce_timer = nil
 
 function M.merge(heading_filter, markdown_tasks, conflict_resolution)
   local tw_tasks = task.query(heading_filter)
@@ -355,6 +407,15 @@ function M.merge(heading_filter, markdown_tasks, conflict_resolution)
   }
 end
 
+function M.debounced_sync(bufnr, debounce_ms)
+  if M.debounce_timer then
+    vim.fn.timer_stop(M.debounce_timer)
+  end
+  M.debounce_timer = vim.fn.timer_start(debounce_ms, function()
+    M.sync({ bufnr = bufnr })
+  end)
+end
+
 function M.sync(opts)
   opts = opts or {}
   local bufnr = opts.bufnr or vim.api.nvim_get_current_buf()
@@ -373,7 +434,7 @@ function M.sync(opts)
     end
     
     -- Parse buffer
-    parser.setup({ bufnr = bunr })
+    parser.setup({ bufnr = bufnr })
     local parsed = parser.parse()
     
     -- Process each heading with filter
@@ -542,29 +603,14 @@ end
 return M
 ```
 
-- [ ] **Step 3: Add debounced sync to sync.lua**
-
-Add to sync.lua:
-
-```lua
-function M.debounced_sync(bufnr, debounce_ms)
-  if M.debounce_timer then
-    vim.fn.timer_stop(M.debounce_timer)
-  end
-  M.debounce_timer = vim.fn.timer_start(debounce_ms, function()
-    M.sync({ bufnr = bufnr })
-  end)
-end
-```
-
-- [ ] **Step 4: Test manually**
+- [ ] **Step 3: Test manually**
 
 Create a test markdown file, add sync keymap, verify it works.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add lua/tasknv/init.lua lua/tasknv/sync.lua && git commit -m "feat: wire up autocmd and expose sync API"
+git add lua/tasknv/init.lua && git commit -m "feat: wire up autocmd and expose sync API"
 ```
 
 ---
@@ -588,13 +634,13 @@ require("tasknv").sync()
 - [ ] **Step 3: Verify tasks created in taskwarrior**
 
 ```bash
-task project:Work
+task rc:/home/pete/Projects/tasknv.nvim/test/fixtures/taskrc project:Work
 ```
 
 - [ ] **Step 4: Add a task in taskwarrior**
 
 ```bash
-task add project:Work "Task from TW"
+task rc:/home/pete/Projects/tasknv.nvim/test/fixtures/taskrc add project:Work "Task from TW"
 ```
 
 - [ ] **Step 5: Run sync again**
