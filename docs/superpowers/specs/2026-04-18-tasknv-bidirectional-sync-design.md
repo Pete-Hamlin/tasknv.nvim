@@ -61,18 +61,20 @@ Markdown File → Treesitter Parse → Task List with Metadata
 **Inline (visible):**
 - Description
 - Due date: `due:2024-01-15`
-- Priority: `!!!` (high), `!!` (medium), `!` (low)
-- Recurrence: `recur:weekly`
 
 **Hidden (comment-based):**
 - UUID: `<!--uuid:abc-123-->`
-- Additional attributes: `<!--project:Work +urgent-->`
+- Priority: `<!--priority:H-->` (taskwarrior UDA, defaults mapped to L/M/H)
+- Recurrence: `<!--recur:weekly-->`
+- Additional attributes: `<!--project:Work +work +urgent-->`
 - Stored inline after task text, hidden via conceal
 
 **Example:**
 ```markdown
-* [ ] Fix critical bug due:2024-01-15 !!! <!--uuid:f47ac11b-58cc-4372-a567-0e02b2c3d479-->
+* [ ] Fix critical bug due:2024-01-15 <!--uuid:f47ac11b-58cc-4372-a567-0e02b2c3d479-->
 ```
+
+**Priority syntax:** Users write `!!!`, `!!`, `!` in markdown. The plugin maps these to taskwarrior priority values via config (see Configuration). The actual priority UDA value is stored in hidden metadata.
 
 ### 3. Sync Behavior
 
@@ -105,22 +107,46 @@ Markdown File → Treesitter Parse → Task List with Metadata
 
 ```lua
 require("tasknv").setup({
-  sync_on_save = true,           -- Auto-sync on buffer write
-  conflict_resolution = "markdown",  -- Default conflict strategy
-  default_project = nil,        -- Fallback project if no filter
+  -- Auto-sync on buffer write. Can be toggled per-buffer with :TaskNvEnable/:TaskNvDisable
+  sync_on_save = true,
+
+  -- Default conflict strategy when markdown and taskwarrior differ.
+  -- Options: "markdown" | "taskwarrior" | "newer" | "ask"
+  -- Can be overridden at call time via :TaskNvSync markdown
+  conflict_resolution = "markdown",
+
+  -- Default project to use when no filter is specified on a heading.
+  -- If nil, tasks without a filter will not sync.
+  default_project = nil,
+
+  -- Mapping of markdown priority syntax to taskwarriority priority UDA values.
+  -- Users write !!!/!!/! in markdown, these map to TW's priority values.
+  priority = {
+    ["!!!"] = "H",  -- High priority
+    ["!!"] = "M",   -- Medium priority
+    ["!"] = "L",    -- Low priority
+  },
+
+  -- Task status mapping from markdown checkboxes to taskwarrior status
+  task_status = {
+    [" "] = "pending",   -- Unchecked [ ]
+    [">"] = "active",    -- Started [>]
+    ["x"] = "completed", -- Checked [x]
+    ["~"] = "deleted",  -- Deleted [~]
+  },
+
+  -- Metadata comment configuration for storing UUIDs and extra attributes
   metadata = {
+    -- Prefix/suffix for hidden metadata comments
     prefix = "<!--",
     suffix = "-->",
+    -- UUID format pattern (UUID v4)
     uuid_pattern = "%x%x%x%x%x%x%x%x-%x%x%x%x-%x%x%x%x-%x%x%x%x-%x%x%x%x%x%x%x%x%x%x",
   },
-  task_status = {
-    [" "] = "pending",
-    [">"] = "active",
-    ["x"] = "completed",
-    ["~"] = "deleted",
-  },
-  -- Override at call time: :Sync markdown taskwarrior
-  -- Per-command override: :Sync markdown
+
+  -- Taskwarrior command prefix. Useful if task is not in PATH or you need specific RC path.
+  -- Default: "task" (uses system PATH)
+  task_command = "task",
 })
 ```
 
