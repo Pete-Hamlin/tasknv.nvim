@@ -119,12 +119,21 @@ require("tasknv").setup({
   -- If nil, tasks without a filter will not sync.
   default_project = nil,
 
-  -- Mapping of markdown priority syntax to taskwarriority priority UDA values.
+  -- Mapping of markdown priority syntax to taskwarrior priority UDA values.
   -- Users write !!!/!!/! in markdown, these map to TW's priority values.
+  -- Can have any number of mappings (e.g., "!!!!" for critical, or custom UDA values)
   priority = {
     ["!!!"] = "H",  -- High priority
     ["!!"] = "M",   -- Medium priority
     ["!"] = "L",    -- Low priority
+  },
+
+  -- Tag syntax mapping. Users write +tag in markdown, maps to taskwarrior tags.
+  -- Key is the markdown syntax (what user types), value is taskwarrior tag.
+  tags = {
+    ["+work"] = "work",
+    ["+home"] = "home",
+    -- Can be empty table {} if no mapping needed (use raw markdown syntax)
   },
 
   -- Task status mapping from markdown checkboxes to taskwarrior status
@@ -143,20 +152,32 @@ require("tasknv").setup({
     -- UUID format pattern (UUID v4)
     uuid_pattern = "%x%x%x%x%x%x%x%x-%x%x%x%x-%x%x%x%x-%x%x%x%x-%x%x%x%x%x%x%x%x%x%x",
   },
-
-  -- Taskwarrior command prefix. Useful if task is not in PATH or you need specific RC path.
-  -- Default: "task" (uses system PATH)
-  task_command = "task",
 })
 ```
 
 ### 6. Commands
 
-- `:TaskNvSync` — Run sync for current buffer
-- `:TaskNvSync markdown` — Force markdown as source of truth
-- `:TaskNvSync taskwarrior` — Force taskwarrior as source of truth
-- `:TaskNvEnable` — Enable auto-sync for current buffer
-- `:TaskNvDisable` — Disable auto-sync for current buffer
+Users can create their own keymaps using the Lua API:
+
+```lua
+-- Run sync with default conflict resolution (from config)
+vim.keymap.set("n", "<leader>ms", require("tasknv").sync)
+
+-- Run sync, force markdown as source of truth
+vim.keymap.set("n", "<leader>mm", function()
+  require("tasknv").sync({ conflict_resolution = "markdown" })
+end)
+
+-- Run sync, force taskwarrior as source of truth
+vim.keymap.set("n", "<leader>mt", function()
+  require("tasknv").sync({ conflict_resolution = "taskwarrior" })
+end)
+```
+
+**Lua API:**
+- `require("tasknv").sync(opts)` — Run sync for current buffer
+  - `opts.conflict_resolution` — Override default conflict strategy ("markdown" | "taskwarrior" | "newer")
+  - `opts.bufnr` — Specific buffer to sync (defaults to current)
 
 ### 7. Ignored Tasks
 
