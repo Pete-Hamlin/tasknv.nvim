@@ -19,40 +19,72 @@ end
 
 M.parse = function()
 	if not M.parser or not M.markdown_task_query then
-		-- Nothing to do
-		return
+		return { headings = {} }
 	end
 
 	local tree = M.parser:parse()[1]
 	local root = tree:root()
-	local tasks = {}
+	local headings = {}
+	local current_heading = nil
+	local processed_ranges = {}
 
-	local current_heading_filters = nil
-
-	-- Iterate over captures in the query
 	for id, node in M.markdown_task_query:iter_captures(root, M.bufnr) do
 		local name = M.markdown_task_query.captures[id]
-		--
-		-- Handle headings
-		if name == "heading_text" then
-			local current_heading = M.text(node)
-			current_heading_filters = M.extract_metadata(current_heading)
-		end
+		local sr, sc, er, ec = node:range()
+		local range_key = string.format("%d:%d-%d:%d", sr, sc, er, ec)
 
-		-- Handle task tex
-		if name == "task_list" then
-			M.iterate_tasklist(node, tasks, { filters = current_heading_filters })
+		if processed_ranges[range_key] then
+			goto continue
 		end
+		processed_ranges[range_key] = true
+
+		if name == "heading_text" then
+			if current_heading and #current_heading.tasks > 0 then
+				table.insert(headings, current_heading)
+			end
+			local text = M.text(node)
+			current_heading = {
+				filter = M.extract_filter(text),
+				tasks = {},
+			}
+		elseif name == "task_list" then
+			if current_heading then
+				M.iterate_tasklist(node, current_heading.tasks, { filters = current_heading.filter })
+			end
+		end
+		::continue::
 	end
-	-- __AUTO_GENERATED_PRINT_VAR_START__
-	print([==[M.parse tasks:]==], vim.inspect(tasks)) -- __AUTO_GENERATED_PRINT_VAR_END__
-	return tasks
+
+	if current_heading and #current_heading.tasks > 0 then
+		table.insert(headings, current_heading)
+	end
+
+	print("[==M.parse headings:==]", vim.inspect(headings))
+	return { headings = headings }
 end
 
 M.extract_metadata = function(str)
 	local filter = str:match(M.metadata_regex)
 	-- if no match, clear filter
 	return filter or ""
+end
+
+M.extract_filter = function(str)
+	local filter = str:match("%s*|%s*(.+)")
+	return filter or ""
+end
+
+M.extract_uuid = function(str)
+	local start = str:find("uuid:")
+	if start then
+		local rest = str:sub(start + 5)
+		local uuid = rest:sub(1, 36)
+		if #rest >= 36 then
+			return uuid
+		end
+		return rest
+	end
+	return ""
 end
 
 -- Iterate through a given task list, parsing each list_item into a task table
@@ -71,13 +103,10 @@ M.capture_task = function(node, opts)
 			-- Determine state of task based on checkmark
 			task.status = "completed"
 		elseif type == "paragraph" then
-			-- Parse the main task definition and metadata
 			local text = M.text(child)
 			local metadata = M.extract_metadata(text)
+			local uuid = M.extract_uuid(text)
 			text = text:gsub(M.metadata_regex, "")
-
-			-- TODO: Extract/temp create ID here
-			local uuid = "foo"
 
 			task.uuid = uuid
 			task.details = text:match("^%s*(.-)%s*$")
