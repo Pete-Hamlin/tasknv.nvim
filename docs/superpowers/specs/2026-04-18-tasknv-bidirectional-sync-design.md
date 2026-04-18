@@ -80,18 +80,25 @@ Markdown File → Treesitter Parse → Task List with Metadata
 
 **Trigger:** File save (via autocmd, configurable via `sync_on_save`)
 
+**Auto-sync Debounce:**
+- When `sync_on_save` is enabled, a debounce timer delays execution
+- If another save occurs within the debounce window, timer resets
+- Default debounce: 500ms (configurable)
+- This prevents spamming taskwarrior on rapid saves
+
 **Async Execution:**
 - All taskwarrior operations run asynchronously in the background
 - Buffer remains fully interactive during sync — user can edit/view while sync runs
-- User can trigger multiple syncs (subsequent syncs queue or replace previous)
+- User can trigger multiple syncs (subsequent syncs replace previous)
 - No blocking of the main thread
 
-**Visual Feedback (Virtual Text):**
-- While sync is in progress, virtual text is shown on the first line of each task list:
+**Visual Feedback (Virtual Text - Task List Lock):**
+- While sync is in progress, the task list is replaced with virtual text:
   - Processing state: "Syncing... (0/X tasks)"
   - Progress updates: "Syncing... (3/10 tasks)"
-  - Completion: "Synced ✓" (fades after 2 seconds)
-- Virtual text updates in real-time as tasks are processed
+- This prevents user edits to the task list that would be lost when the list is re-rendered
+- User can still edit other parts of the file (other headings, unrelated content)
+- On completion, virtual text is removed and processed task list is rendered
 
 **Per-heading sync:**
 1. Parse markdown tasks under filtered heading
@@ -120,8 +127,12 @@ Markdown File → Treesitter Parse → Task List with Metadata
 
 ```lua
 require("tasknv").setup({
-  -- Auto-sync on buffer write. Can be toggled per-buffer with :TaskNvEnable/:TaskNvDisable
+  -- Auto-sync on buffer write (runs asynchronously, does not block)
   sync_on_save = true,
+
+  -- Debounce delay (in ms) for auto-sync. Prevents spamming taskwarrior on rapid saves.
+  -- If another save occurs within this window, timer resets.
+  sync_debounce_ms = 500,
 
   -- Default conflict strategy when markdown and taskwarrior differ.
   -- Options: "markdown" | "taskwarrior" | "newer" | "ask"
@@ -191,7 +202,7 @@ end)
 - `require("tasknv").sync(opts)` — Run sync for current buffer (async, returns immediately)
   - `opts.conflict_resolution` — Override default conflict strategy ("markdown" | "taskwarrior" | "newer")
   - `opts.bufnr` — Specific buffer to sync (defaults to current)
-  - Returns: `{ sync_id: number, task_count: number }` — use sync_id to check status if needed
+  - Returns: `{ sync_id: number }` — ID of this sync operation (replaces any in-progress sync for same buffer)
 
 ### 7. Ignored Tasks
 
