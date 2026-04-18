@@ -14,7 +14,7 @@ end
 
 function M.get_test_config()
   return {
-    taskrc_file = M.test_taskrc,
+    rc_file = M.test_taskrc,
     sync_on_save = false,
   }
 end

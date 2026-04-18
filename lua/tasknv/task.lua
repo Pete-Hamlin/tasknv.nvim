@@ -3,7 +3,7 @@ local M = {}
 local config = require("tasknv.config")
 
 local function get_task_cmd(base_cmd)
-  local taskrc = config.taskrc_file
+  local taskrc = config.rc_file
   if taskrc and vim.fn.filereadable(taskrc) == 1 then
     return base_cmd .. " rc:" .. vim.fn.shellescape(taskrc)
   end
@@ -80,6 +80,11 @@ function M.update(uuid, task_data)
   end
   if task_data.status then
     cmd = cmd .. " status:" .. vim.fn.shellescape(task_data.status)
+  end
+  if task_data.tags then
+    for _, tag in ipairs(task_data.tags) do
+      cmd = cmd .. " +" .. vim.fn.shellescape(tag)
+    end
   end
 
   run_task(cmd)

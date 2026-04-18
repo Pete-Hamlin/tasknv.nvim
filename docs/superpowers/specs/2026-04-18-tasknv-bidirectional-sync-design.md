@@ -179,7 +179,7 @@ require("tasknv").setup({
 
   -- Path to custom taskrc file. If nil, uses default (~/taskrc).
   -- Useful for isolating taskwarrior data or using alternate configs.
-  taskrc_file = nil,
+  rc_file = nil,
 })
 ```
 

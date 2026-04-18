@@ -76,7 +76,7 @@ local defaults = {
   },
   -- Path to custom taskrc file. If nil, uses default.
   -- Useful for isolating taskwarrior data or using alternate configs.
-  taskrc_file = nil,
+  rc_file = nil,
 }
 ```
 
@@ -123,7 +123,7 @@ end
 
 function M.get_test_config()
   return {
-    taskrc_file = M.test_taskrc,
+    rc_file = M.test_taskrc,
     sync_on_save = false,
   }
 end
@@ -195,7 +195,7 @@ local M = {}
 local config = require("tasknv.config")
 
 local function get_task_cmd(base_cmd)
-  local taskrc = config.taskrc_file
+  local taskrc = config.rc_file
   if taskrc then
     return base_cmd .. " rc:" .. vim.fn.shellescape(taskrc)
   end
